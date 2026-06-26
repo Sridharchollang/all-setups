@@ -16,3 +16,7 @@ su - sonar -c "sh /opt/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh start"
 #run this on server manually to check status
 #sh /opt/sonarqube-8.9.6.50800/bin/linux-x86-64/sonar.sh status
 #echo "user=admin & password=admin"
+
+
+
+##clean  package  sonar:sonar  -Dsonar.projectKey=myweb  -Dsonar.projectName=Java-Home-MyWeb  -Dsonar.sources=src/main/webapp  -Dsonar.host.url=http://54.234.54.99:9000  -Dsonar.login=8167c1ac5fb92a9c3a2ae2b79360862fb04223d4
