@@ -1,0 +1,373 @@
+# SOP: Configure Apache HTTPD Logs to AWS CloudWatch Logs Using Amazon CloudWatch Agent
+
+## Objective
+
+Configure an Amazon Linux 2 EC2 instance to send Apache HTTPD Access Logs and Error Logs to AWS CloudWatch Log Groups.
+
+---
+
+# Step 1: Launch EC2 Instance
+
+* Launch an Amazon Linux 2 EC2 instance.
+* Allow the following inbound ports in the Security Group:
+
+  * SSH (22)
+  * HTTP (80)
+
+---
+
+# Step 2: Update the Server
+
+```bash
+sudo yum update -y
+```
+
+---
+
+# Step 3: Install Apache HTTP Server
+
+```bash
+sudo yum install httpd -y
+```
+
+Start Apache Service
+
+```bash
+sudo systemctl start httpd
+```
+
+Enable Apache Service
+
+```bash
+sudo systemctl enable httpd
+```
+
+Verify Apache Status
+
+```bash
+sudo systemctl status httpd
+```
+
+---
+
+# Step 4: Deploy Sample Application
+
+Create an HTML page
+
+```bash
+sudo vi /var/www/html/index.html
+```
+
+Example Content
+
+```html
+<html>
+<head>
+<title>CloudWatch Demo</title>
+</head>
+<body>
+<h1>Apache HTTPD Server</h1>
+<h2>CloudWatch Agent Demo</h2>
+</body>
+</html>
+```
+
+Restart Apache
+
+```bash
+sudo systemctl restart httpd
+```
+
+Verify
+
+```text
+http://<EC2-Public-IP>
+```
+
+---
+
+# Step 5: Create IAM Role
+
+Create an IAM Role with:
+
+Trusted Entity
+
+* EC2
+
+Attach Policy
+
+```
+CloudWatchAgentServerPolicy
+```
+
+Attach the IAM Role to the EC2 Instance.
+
+Verify IAM Role
+
+```bash
+curl http://169.254.169.254/latest/meta-data/iam/security-credentials/
+```
+
+You should see your IAM Role name.
+
+---
+
+# Step 6: Install AWS CloudWatch Agent
+
+```bash
+sudo yum install amazon-cloudwatch-agent -y
+```
+
+Verify Installation
+
+```bash
+rpm -qa | grep amazon-cloudwatch-agent
+```
+
+---
+
+# Step 7: Create CloudWatch Agent Configuration File
+
+```bash
+sudo vi /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+```
+
+Paste the following JSON
+
+```json
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/httpd/access_log",
+            "log_group_name": "/apache/access-log",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/httpd/error_log",
+            "log_group_name": "/apache/error-log",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Save the file.
+
+---
+
+# Step 8: Start CloudWatch Agent
+
+```bash
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+-a fetch-config \
+-m ec2 \
+-c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+-s
+```
+
+---
+
+# Step 9: Verify CloudWatch Agent Status
+
+```bash
+sudo systemctl status amazon-cloudwatch-agent
+```
+
+---
+
+# Step 10: Verify Agent Logs
+
+```bash
+tail -f /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
+```
+
+Expected Output
+
+```
+piping log from /apache/access-log
+
+piping log from /apache/error-log
+```
+
+---
+
+# Step 11: Verify Apache Logs
+
+Access Log
+
+```bash
+tail -f /var/log/httpd/access_log
+```
+
+Error Log
+
+```bash
+tail -f /var/log/httpd/error_log
+```
+
+---
+
+# Step 12: Generate Traffic
+
+Open Browser
+
+```
+http://<EC2-Public-IP>
+```
+
+Or
+
+```bash
+curl http://localhost
+```
+
+Refresh the page multiple times.
+
+---
+
+# Step 13: Verify CloudWatch Log Groups
+
+AWS Console
+
+CloudWatch
+
+↓
+
+Log Groups
+
+You should see
+
+```
+/apache/access-log
+
+/apache/error-log
+```
+
+---
+
+# Step 14: Verify Log Streams
+
+Open
+
+```
+/apache/access-log
+```
+
+Select the Log Stream
+
+Verify Access Logs
+
+Repeat the same for
+
+```
+/apache/error-log
+```
+
+---
+
+# Step 15: Generate Error Logs
+
+Open
+
+```
+http://<EC2-Public-IP>/test
+```
+
+You should receive
+
+```
+404 Not Found
+```
+
+Verify the logs in
+
+```bash
+tail -f /var/log/httpd/error_log
+```
+
+and
+
+CloudWatch Log Group
+
+```
+/apache/error-log
+```
+
+---
+
+# Step 16: Useful Verification Commands
+
+Check Apache
+
+```bash
+sudo systemctl status httpd
+```
+
+Restart Apache
+
+```bash
+sudo systemctl restart httpd
+```
+
+Check CloudWatch Agent
+
+```bash
+sudo systemctl status amazon-cloudwatch-agent
+```
+
+Restart CloudWatch Agent
+
+```bash
+sudo systemctl restart amazon-cloudwatch-agent
+```
+
+Verify IAM Role
+
+```bash
+curl http://169.254.169.254/latest/meta-data/iam/security-credentials/
+```
+
+List CloudWatch Log Groups
+
+```bash
+aws logs describe-log-groups --region us-east-1
+```
+
+View Agent Logs
+
+```bash
+tail -f /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
+```
+
+View Apache Access Logs
+
+```bash
+tail -f /var/log/httpd/access_log
+```
+
+View Apache Error Logs
+
+```bash
+tail -f /var/log/httpd/error_log
+```
+
+---
+
+# Outcome
+
+* Apache HTTPD installed successfully.
+* Sample application hosted.
+* IAM Role attached to EC2.
+* Amazon CloudWatch Agent installed and configured.
+* Apache Access Logs streamed to `/apache/access-log`.
+* Apache Error Logs streamed to `/apache/error-log`.
+* Logs successfully viewed in AWS CloudWatch Console.
+* Centralized logging implemented for monitoring and troubleshooting.
