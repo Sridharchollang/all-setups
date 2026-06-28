@@ -1,0 +1,121 @@
+# Update packages
+sudo yum update -y
+
+# Install Apache
+sudo yum install httpd -y
+
+# Start Apache
+sudo systemctl enable httpd
+sudo systemctl start httpd
+
+# Verify Apache
+systemctl status httpd
+
+# Install CloudWatch Agent
+sudo yum install amazon-cloudwatch-agent -y
+
+# Create IAM Role
+# CloudWatchAgentServerPolicy
+# Attach role to EC2 instance
+
+# Verify IAM Role
+curl http://169.254.169.254/latest/meta-data/iam/security-credentials/
+
+# Create CloudWatch Agent JSON
+sudo tee /opt/aws/amazon-cloudwatch-agent/etc/log-config.json > /dev/null <<EOF
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/httpd/access_log",
+            "log_group_name": "/apache/access-log",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/httpd/error_log",
+            "log_group_name": "/apache/error-log",
+            "log_stream_name": "{instance_id}",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
+# Apply Configuration
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+-a fetch-config \
+-m ec2 \
+-c file:/opt/aws/amazon-cloudwatch-agent/etc/log-config.json \
+-s
+
+# Verify Agent
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a status
+
+# Restart Agent
+sudo systemctl restart amazon-cloudwatch-agent
+
+# Agent Logs
+tail -f /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log
+
+# Apache Access Logs
+tail -f /var/log/httpd/access_log
+
+# Apache Error Logs
+tail -f /var/log/httpd/error_log
+
+# Create Sample HTML
+sudo tee /var/www/html/index.html > /dev/null <<EOF
+<html>
+<head>
+<title>CloudWatch Demo</title>
+</head>
+<body>
+<h1>Apache HTTPD CloudWatch Logs Demo</h1>
+</body>
+</html>
+EOF
+
+# Restart Apache
+sudo systemctl restart httpd
+
+# Test Application
+curl http://localhost
+
+# Generate Traffic
+for i in {1..50}; do curl http://localhost; done
+
+# Verify CloudWatch Log Groups
+aws logs describe-log-groups --region us-east-1
+
+# Verify Log Streams
+aws logs describe-log-streams \
+--log-group-name "/apache/access-log" \
+--region us-east-1
+
+aws logs describe-log-streams \
+--log-group-name "/apache/error-log" \
+--region us-east-1
+
+# Check IAM Identity
+aws sts get-caller-identity
+
+# Check Region
+aws configure get region
+
+# Restart Apache
+sudo systemctl restart httpd
+
+# Restart CloudWatch Agent
+sudo systemctl restart amazon-cloudwatch-agent
+
+# Check Agent Status
+sudo systemctl status amazon-cloudwatch-agent
+
+# Check Apache Status
+sudo systemctl status httpd
