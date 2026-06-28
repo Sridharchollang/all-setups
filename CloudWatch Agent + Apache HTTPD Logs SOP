@@ -14,9 +14,10 @@ systemctl status httpd
 # Install CloudWatch Agent
 sudo yum install amazon-cloudwatch-agent -y
 
-# Create IAM Role
-# CloudWatchAgentServerPolicy
-# Attach role to EC2 instance
+
+Create IAM Role   ==>> cloudwatchlog
+CloudWatchAgentServerPolicy
+Attach role to EC2 instance
 
 # Verify IAM Role
 curl http://169.254.169.254/latest/meta-data/iam/security-credentials/
